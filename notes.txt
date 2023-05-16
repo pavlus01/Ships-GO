@@ -1,0 +1,2 @@
+start <- contex with cancel
+wywołujemy metodę i zamykamy planszę
