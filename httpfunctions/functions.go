@@ -208,6 +208,8 @@ func FirstConnection(desc, name, opponent string) error {
 		coordsChecked += shotsCounter
 	}
 
+	ctx, stop := context.WithCancel(context.Background())
+
 	go func() {
 		for {
 			time.Sleep(time.Millisecond * 300)
@@ -220,7 +222,6 @@ func FirstConnection(desc, name, opponent string) error {
 			if data.Game_status == "ended" {
 				if data.Last_game_status == "win" {
 					txt.SetText(fmt.Sprintf("YOU WON"))
-					break
 				} else {
 					txt.SetText(fmt.Sprintf("OPPONENT WON"))
 					for _, coordinate := range bo.Board {
@@ -230,8 +231,10 @@ func FirstConnection(desc, name, opponent string) error {
 						}
 					}
 					board.SetStates(states)
-					break
 				}
+				time.Sleep(time.Second * 7)
+				stop()
+				break
 			}
 
 			if data.Should_fire {
@@ -241,7 +244,6 @@ func FirstConnection(desc, name, opponent string) error {
 			}
 		}
 	}()
-	ctx := context.Background()
 	ui.Start(ctx, nil)
 
 	return nil

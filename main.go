@@ -9,12 +9,14 @@ import (
 func main() {
 
 	nick, desc := intercation.PlayerDescription()
-	oppo, err := intercation.ShowPlayersList()
-	err2 := httpfunctions.FirstConnection(desc, nick, oppo)
-	if err != nil {
-		log.Fatal(err)
-	}
-	if err2 != nil {
-		log.Fatal(err2)
+	for {
+		oppo, err := intercation.ShowPlayersList()
+		err2 := httpfunctions.FirstConnection(desc, nick, oppo)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err2 != nil {
+			log.Fatal(err2)
+		}
 	}
 }

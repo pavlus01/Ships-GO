@@ -42,6 +42,8 @@ func ShowPlayersList() (string, error) {
 
 	var data Player_List
 
+	fmt.Println("Available players list: ")
+
 	err := json.NewDecoder(resp2.Body).Decode(&data)
 	if err != nil {
 		return "", fmt.Errorf("cannot unmarshal data: %w", err)
