@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"shipsgo/helpers"
 	"strconv"
 	"strings"
 	"time"
@@ -14,10 +15,11 @@ import (
 )
 
 type Request_data struct {
-	Desc        string `json:"desc"`
-	Nick        string `json:"nick"`
-	Target_nick string `json:"target_nick"`
-	Wpbot       bool   `json:"wpbot"`
+	Coords      []string `json:"coords"`
+	Desc        string   `json:"desc"`
+	Nick        string   `json:"nick"`
+	Target_nick string   `json:"target_nick"`
+	Wpbot       bool     `json:"wpbot"`
 }
 
 type StatusResponse struct {
@@ -61,12 +63,12 @@ type Fire_result struct {
 	Result string `json:"result"`
 }
 
-func FirstConnection(desc, name, opponent string) error {
+func FirstConnection(desc string, name *string, opponent string, client http.Client, coord []string) error {
 	var request_data Request_data
-	if name != "" {
-		request_data = Request_data{Desc: desc, Nick: name, Target_nick: "", Wpbot: false}
+	if *name != "" {
+		request_data = Request_data{Coords: coord, Desc: desc, Nick: *name, Target_nick: "", Wpbot: false}
 	} else {
-		request_data = Request_data{Target_nick: "", Wpbot: false}
+		request_data = Request_data{Coords: coord, Target_nick: "", Wpbot: false}
 	}
 	if opponent != "" {
 		if opponent == "wpbot" {
@@ -78,26 +80,20 @@ func FirstConnection(desc, name, opponent string) error {
 	}
 	encoded_data, _ := json.Marshal(request_data)
 
-	resp, err := http.Post("https://go-pjatk-server.fly.dev/api/game", "application/json", bytes.NewBuffer(encoded_data))
+	resp, err := helpers.Request(client, http.MethodPost, "https://go-pjatk-server.fly.dev/api/game", bytes.NewBuffer(encoded_data), "", 5)
 	if err != nil {
 		return fmt.Errorf("cannot create request: %w", err)
 	}
 	token := resp.Header.Get("x-auth-token")
 
 	var data GameStatus
-	client := &http.Client{Timeout: time.Second * 5}
 
 	for data.Game_status != "game_in_progress" {
 
 		time.Sleep(time.Second * 1)
-		req, err2 := http.NewRequest(http.MethodGet, "https://go-pjatk-server.fly.dev/api/game", nil)
-		req.Header.Set("x-auth-token", token)
-		resp2, err3 := client.Do(req)
+		resp2, err2 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game", nil, token, 5)
 		if err2 != nil {
 			return fmt.Errorf("cannot create request: %w", err2)
-		}
-		if err3 != nil {
-			return fmt.Errorf("cannot create request: %w", err3)
 		}
 
 		err = json.NewDecoder(resp2.Body).Decode(&data)
@@ -107,30 +103,26 @@ func FirstConnection(desc, name, opponent string) error {
 
 	}
 
-	req2, err4 := http.NewRequest("GET", "https://go-pjatk-server.fly.dev/api/game/board", nil)
-	req2.Header.Add("x-auth-token", token)
-	if err4 != nil {
-		return fmt.Errorf("cannot unmarshal data: %w", err)
-	}
-	resp4, err5 := client.Do(req2)
-	if err5 != nil {
-		return fmt.Errorf("cannot unmarshal data: %w", err)
-	}
 	var bo Board
-	err = json.NewDecoder(resp4.Body).Decode(&bo)
-	if err != nil {
-		return fmt.Errorf("cannot unmarshal data: %w", err)
+	if coord == nil {
+		resp4, err4 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game/board", nil, token, 5)
+		if err4 != nil {
+			return fmt.Errorf("cannot unmarshal data: %w", err)
+		}
+
+		err = json.NewDecoder(resp4.Body).Decode(&bo)
+		if err != nil {
+			return fmt.Errorf("cannot unmarshal data: %w", err)
+		}
+	} else {
+		bo.Board = coord
 	}
 
-	req3, err6 := http.NewRequest("GET", "https://go-pjatk-server.fly.dev/api/game/desc", nil)
-	req3.Header.Add("x-auth-token", token)
+	resp5, err6 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game/desc", nil, token, 5)
 	if err6 != nil {
 		return fmt.Errorf("cannot unmarshal data: %w", err)
 	}
-	resp5, err7 := client.Do(req3)
-	if err7 != nil {
-		return fmt.Errorf("cannot unmarshal data: %w", err)
-	}
+
 	var gDesc GameDescription
 	err = json.NewDecoder(resp5.Body).Decode(&gDesc)
 	if err != nil {
@@ -139,11 +131,14 @@ func FirstConnection(desc, name, opponent string) error {
 
 	ui := gui.NewGUI(true)
 
-	txt := gui.NewText(1, 1, "Press on any coordinate to log it.", nil)
+	txt := gui.NewText(1, 1, "Welcome to the game :)", nil)
 	ui.Draw(txt)
+	timer := gui.NewText(50, 1, "TIMER: ", nil)
+	ui.Draw(timer)
 	ui.Draw(gui.NewText(1, 2, "Press Ctrl+C to exit", nil))
 	ui.Draw(gui.NewText(1, 3, data.Nick+" vs "+data.Opponent, nil))
-	accu := gui.NewText(1, 4, "Shot precision: 0%", nil)
+	*name = data.Nick
+	accu := gui.NewText(1, 4, "Shot precision: 0.0%", nil)
 	ui.Draw(accu)
 	if len(gDesc.Desc) > 90 {
 		ui.Draw(gui.NewText(1, 28, gDesc.Desc[:45], nil))
@@ -199,7 +194,7 @@ func FirstConnection(desc, name, opponent string) error {
 				oppHitCounter++
 				states[x][y-1] = gui.Hit
 				time.Sleep(time.Second * 1)
-				Get_Opp_Shot(board, board2, &states, &states2, ui, client, token, &oppHitCounter, &coordsChecked)
+				Get_Opp_Shot(board, board2, &states, &states2, ui, &client, token, &oppHitCounter, &coordsChecked)
 			} else {
 				states[x][y-1] = gui.Miss
 			}
@@ -212,13 +207,15 @@ func FirstConnection(desc, name, opponent string) error {
 
 	go func() {
 		for {
+			ui.Log("ABBA_ENTRANCE")
 			time.Sleep(time.Millisecond * 300)
-			data, err := GetGameStatus(client, token)
+			data, err := GetGameStatus(&client, token)
 			if err != nil {
 				ui.Log("cannot get data: %w", err)
 				break
 			}
 
+			ui.Log("ABBA_CHECK")
 			if data.Game_status == "ended" {
 				if data.Last_game_status == "win" {
 					txt.SetText(fmt.Sprintf("YOU WON"))
@@ -232,15 +229,46 @@ func FirstConnection(desc, name, opponent string) error {
 					}
 					board.SetStates(states)
 				}
-				time.Sleep(time.Second * 7)
+				time.Sleep(time.Second * 3)
 				stop()
 				break
 			}
 
+			ui.Log("ABBA_POSTCHECK")
 			if data.Should_fire {
-				Shot(board, board2, &states, &states2, ui, client, token, &myHitCounter, &myHits, accu)
+				txt.SetText("Your turn!")
+
+				ctx_ticker, stop_ticker := context.WithCancel(context.Background())
+				ticker := time.NewTicker(time.Second)
+				done := make(chan bool)
+
+				go func() {
+					tmp := data.Timer
+					for {
+						select {
+						case <-done:
+							ticker.Stop()
+							return
+						case <-ticker.C:
+							tmp = tmp - 1
+							timer.SetText("TIME: " + strconv.Itoa(tmp))
+							if tmp <= 0 {
+								stop_ticker()
+							}
+						}
+					}
+				}()
+
+				Shot(&ctx_ticker, board, board2, &states, &states2, ui, &client, token, &myHitCounter, &myHits, accu, txt)
+				timer.SetText("TIME: ")
+				ui.Log("ABBA_POSTSHOT1")
+				ticker.Stop()
+				done <- true
+				ui.Log("ABBA_POSTSHOT2")
 			} else {
-				Get_Opp_Shot(board, board2, &states, &states2, ui, client, token, &oppHitCounter, &coordsChecked)
+				ui.Log("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")
+				txt.SetText("Opponent turn!")
+				Get_Opp_Shot(board, board2, &states, &states2, ui, &client, token, &oppHitCounter, &coordsChecked)
 			}
 		}
 	}()
@@ -281,22 +309,30 @@ func ChangeCooerdinate(coordinate string) (int, int) {
 	return x, y
 }
 
-func Shot(myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, ui *gui.GUI, client *http.Client, token string, myHitCounter, myHits *float64, text *gui.Text) error {
+func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, ui *gui.GUI, client *http.Client, token string, myHitCounter, myHits *float64, text, main *gui.Text) error {
 	var x, y int
-	char := oppBoard.Listen(context.TODO())
-	ui.Log("My Shot: %s", char)
+	var char string // = oppBoard.Listen(context.TODO())
+	bad_choice := false
+	for !bad_choice {
+		char = oppBoard.Listen(*ctx)
+		if len(char) < 2 {
+			return nil
+		}
+		ui.Log("ABBA_IN")
+		ui.Log("My Shot: %s", char)
+		x, y = ChangeCooerdinate(char)
+		if oppStates[x][y-1] == gui.Hit || oppStates[x][y-1] == gui.Ship || oppStates[x][y-1] == gui.Miss {
+			main.SetText("Field " + char + " is already marked!")
+		} else {
+			bad_choice = true
+		}
+	}
+
 	*myHits++
-	x, y = ChangeCooerdinate(char)
 	fire_data := Fire{Coord: char}
 	encoded_data, _ := json.Marshal(fire_data)
 
-	req, err := http.NewRequest("POST", "https://go-pjatk-server.fly.dev/api/game/fire", bytes.NewBuffer(encoded_data))
-	req.Header.Add("x-auth-token", token)
-	if err != nil {
-		ui.Log("cannot send data: %w", err)
-		return err
-	}
-	resp, err := client.Do(req)
+	resp, err := helpers.Request(*client, http.MethodPost, "https://go-pjatk-server.fly.dev/api/game/fire", bytes.NewBuffer(encoded_data), token, 5)
 	if err != nil {
 		ui.Log("cannot send data: %w", err)
 		return err
@@ -316,6 +352,9 @@ func Shot(myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, 
 	} else {
 		oppStates[x][y-1] = gui.Hit
 		*myHitCounter++
+		if data.Result == "sunk" {
+			SunkShip(oppStates, x, y)
+		}
 		if *myHitCounter == 20 {
 			return nil
 		}
@@ -362,16 +401,9 @@ func Get_Opp_Shot(myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui
 
 func GetGameStatus(client *http.Client, token string) (GameStatus, error) {
 	var data GameStatus
-	req, err := http.NewRequest(http.MethodGet, "https://go-pjatk-server.fly.dev/api/game", nil)
-	req.Header.Set("x-auth-token", token)
-	resp, err2 := client.Do(req)
-	if err != nil || err2 != nil {
-		if err != nil {
-			return GameStatus{}, err
-		}
-		if err2 != nil {
-			return GameStatus{}, err2
-		}
+	resp, err := helpers.Request(*client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game", nil, token, 5)
+	if err != nil {
+		return GameStatus{}, err
 	}
 
 	err3 := json.NewDecoder(resp.Body).Decode(&data)
@@ -390,4 +422,62 @@ func ShortenDesc(desc string) string {
 		ret += l
 	}
 	return ret
+}
+
+func SunkShip(states *[10][10]gui.State, x, y int) {
+	states[x][y-1] = gui.Ship
+	if x <= 9 && x >= 0 && y <= 9 && y >= 0 {
+		if states[x][y] == gui.Hit {
+			SunkShip(states, x, y+1)
+		} else {
+			if states[x][y] != gui.Ship {
+				states[x][y] = gui.Miss
+			}
+		}
+	}
+	if x <= 9 && x >= 0 && y-2 <= 9 && y-2 >= 0 {
+		if states[x][y-2] == gui.Hit {
+			SunkShip(states, x, y-1)
+		} else {
+			if states[x][y-2] != gui.Ship {
+				states[x][y-2] = gui.Miss
+			}
+		}
+	}
+	if x-1 <= 9 && x-1 >= 0 && y-1 <= 9 && y-1 >= 0 {
+		if states[x-1][y-1] == gui.Hit {
+			SunkShip(states, x-1, y)
+		} else {
+			if states[x-1][y-1] != gui.Ship {
+				states[x-1][y-1] = gui.Miss
+			}
+		}
+	}
+	if x+1 <= 9 && x+1 >= 0 && y-1 <= 9 && y-1 >= 0 {
+		if states[x+1][y-1] == gui.Hit {
+			SunkShip(states, x+1, y)
+		} else {
+			if states[x+1][y-1] != gui.Ship {
+				states[x+1][y-1] = gui.Miss
+			}
+		}
+	}
+
+	if x+1 <= 9 && x+1 >= 0 && y <= 9 && y >= 0 && states[x+1][y] != gui.Hit && states[x+1][y] != gui.Ship {
+		states[x+1][y] = gui.Miss
+	}
+
+	if x-1 <= 9 && x-1 >= 0 && y <= 9 && y >= 0 && states[x-1][y] != gui.Hit && states[x-1][y] != gui.Ship {
+		states[x-1][y] = gui.Miss
+	}
+
+	if x-1 <= 9 && x-1 >= 0 && y-2 <= 9 && y-2 >= 0 && states[x-1][y-2] != gui.Hit && states[x-1][y-2] != gui.Ship {
+		states[x-1][y-2] = gui.Miss
+	}
+
+	if x+1 <= 9 && x+1 >= 0 && y-2 <= 9 && y-2 >= 0 && states[x+1][y-2] != gui.Hit && states[x+1][y-2] != gui.Ship {
+		states[x+1][y-2] = gui.Miss
+	}
+
+	return
 }
