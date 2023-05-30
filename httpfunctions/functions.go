@@ -63,7 +63,7 @@ type Fire_result struct {
 	Result string `json:"result"`
 }
 
-func FirstConnection(desc string, name *string, opponent string, client http.Client, coord []string) error {
+func Game(desc string, name *string, opponent string, client http.Client, coord []string) error {
 	var request_data Request_data
 	if *name != "" {
 		request_data = Request_data{Coords: coord, Desc: desc, Nick: *name, Target_nick: "", Wpbot: false}
@@ -131,9 +131,22 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 
 	ui := gui.NewGUI(true)
 
-	txt := gui.NewText(1, 1, "Welcome to the game :)", nil)
+	txt := gui.NewText(1, 1, "Welcome to the game Ships-GO :)", nil)
 	ui.Draw(txt)
-	timer := gui.NewText(50, 1, "TIMER: ", nil)
+
+	sunk_ships := [4]int{4, 3, 2, 1}
+	var ships_texts [4]*gui.Text
+
+	ui.Draw(gui.NewText(70, 1, "Ships left to sink:", nil))
+	for i := 0; i < len(sunk_ships); i++ {
+		ships_texts[i] = gui.NewText(70, 2+i, (strconv.FormatInt(int64(i+1), 10) + " Tier Ship -> " + strconv.FormatInt(int64(sunk_ships[i]), 10)), nil)
+	}
+
+	for i := 0; i < len(sunk_ships); i++ {
+		ui.Draw(ships_texts[i])
+	}
+
+	timer := gui.NewText(50, 2, "TIMER: ", nil)
 	ui.Draw(timer)
 	ui.Draw(gui.NewText(1, 2, "Press Ctrl+C to exit", nil))
 	ui.Draw(gui.NewText(1, 3, data.Nick+" vs "+data.Opponent, nil))
@@ -141,28 +154,28 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 	accu := gui.NewText(1, 4, "Shot precision: 0.0%", nil)
 	ui.Draw(accu)
 	if len(gDesc.Desc) > 90 {
-		ui.Draw(gui.NewText(1, 28, gDesc.Desc[:45], nil))
-		ui.Draw(gui.NewText(1, 29, gDesc.Desc[45:90]+"...", nil))
+		ui.Draw(gui.NewText(1, 29, gDesc.Desc[:45], nil))
+		ui.Draw(gui.NewText(1, 30, gDesc.Desc[45:90]+"...", nil))
 	} else if len(gDesc.Desc) > 45 {
-		ui.Draw(gui.NewText(1, 28, gDesc.Desc[:45], nil))
-		ui.Draw(gui.NewText(1, 29, gDesc.Desc[45:], nil))
+		ui.Draw(gui.NewText(1, 29, gDesc.Desc[:45], nil))
+		ui.Draw(gui.NewText(1, 30, gDesc.Desc[45:], nil))
 	} else {
-		ui.Draw(gui.NewText(1, 28, gDesc.Desc, nil))
+		ui.Draw(gui.NewText(1, 29, gDesc.Desc, nil))
 	}
 
 	if len(gDesc.Opp_desc) > 90 {
-		ui.Draw(gui.NewText(50, 28, gDesc.Opp_desc[:45], nil))
-		ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc[45:90]+"...", nil))
+		ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc[:45], nil))
+		ui.Draw(gui.NewText(50, 30, gDesc.Opp_desc[45:90]+"...", nil))
 	} else if len(gDesc.Opp_desc) > 45 {
-		ui.Draw(gui.NewText(50, 28, gDesc.Opp_desc[:45], nil))
-		ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc[45:], nil))
+		ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc[:45], nil))
+		ui.Draw(gui.NewText(50, 30, gDesc.Opp_desc[45:], nil))
 	} else {
-		ui.Draw(gui.NewText(50, 28, gDesc.Opp_desc, nil))
+		ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc, nil))
 	}
 
 	// boardConfig := gui.BoardConfig{RulerColor: gui.Color{Red: 236, Green: 54, Blue: 54}, TextColor: gui.Color{Red: 88, Green: 243, Blue: 212}}
-	board := gui.NewBoard(1, 6, nil)
-	board2 := gui.NewBoard(50, 6, nil)
+	board := gui.NewBoard(1, 7, nil)
+	board2 := gui.NewBoard(50, 7, nil)
 	ui.Draw(board)
 	ui.Draw(board2)
 	states := [10][10]gui.State{}
@@ -177,7 +190,6 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 	}
 	board.SetStates(states)
 
-	ui.Log("FIRE: %s", data)
 	myHitCounter := 0.0
 	myHits := 0.0
 	oppHitCounter := 0
@@ -185,7 +197,6 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 
 	if len(data.Opp_shots) != 0 {
 
-		ui.Log("DATA: %s", data)
 		shotsCounter := 0
 		for i := coordsChecked; i < len(data.Opp_shots); i++ {
 			x, y := ChangeCooerdinate(data.Opp_shots[i])
@@ -207,15 +218,13 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 
 	go func() {
 		for {
-			ui.Log("ABBA_ENTRANCE")
-			time.Sleep(time.Millisecond * 300)
+			// time.Sleep(time.Millisecond * 300)
 			data, err := GetGameStatus(&client, token)
 			if err != nil {
 				ui.Log("cannot get data: %w", err)
 				break
 			}
 
-			ui.Log("ABBA_CHECK")
 			if data.Game_status == "ended" {
 				if data.Last_game_status == "win" {
 					txt.SetText(fmt.Sprintf("YOU WON"))
@@ -234,7 +243,6 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 				break
 			}
 
-			ui.Log("ABBA_POSTCHECK")
 			if data.Should_fire {
 				txt.SetText("Your turn!")
 
@@ -259,14 +267,11 @@ func FirstConnection(desc string, name *string, opponent string, client http.Cli
 					}
 				}()
 
-				Shot(&ctx_ticker, board, board2, &states, &states2, ui, &client, token, &myHitCounter, &myHits, accu, txt)
+				Shot(&ctx_ticker, board, board2, &states, &states2, ui, &client, token, &myHitCounter, &myHits, accu, txt, &sunk_ships, ships_texts)
 				timer.SetText("TIME: ")
-				ui.Log("ABBA_POSTSHOT1")
 				ticker.Stop()
 				done <- true
-				ui.Log("ABBA_POSTSHOT2")
 			} else {
-				ui.Log("QQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQQ")
 				txt.SetText("Opponent turn!")
 				Get_Opp_Shot(board, board2, &states, &states2, ui, &client, token, &oppHitCounter, &coordsChecked)
 			}
@@ -309,16 +314,15 @@ func ChangeCooerdinate(coordinate string) (int, int) {
 	return x, y
 }
 
-func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, ui *gui.GUI, client *http.Client, token string, myHitCounter, myHits *float64, text, main *gui.Text) error {
+func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, ui *gui.GUI, client *http.Client, token string, myHitCounter, myHits *float64, text, main *gui.Text, sunk_ships *[4]int, ships_texts [4]*gui.Text) error {
 	var x, y int
-	var char string // = oppBoard.Listen(context.TODO())
+	var char string
 	bad_choice := false
 	for !bad_choice {
 		char = oppBoard.Listen(*ctx)
 		if len(char) < 2 {
 			return nil
 		}
-		ui.Log("ABBA_IN")
 		ui.Log("My Shot: %s", char)
 		x, y = ChangeCooerdinate(char)
 		if oppStates[x][y-1] == gui.Hit || oppStates[x][y-1] == gui.Ship || oppStates[x][y-1] == gui.Miss {
@@ -345,7 +349,6 @@ func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppState
 		ui.Log("cannot unmarshal data: %w", err)
 		return err
 	}
-	ui.Log("result: %s", data.Result)
 	if data.Result == "miss" {
 		oppStates[x][y-1] = gui.Miss
 		oppBoard.SetStates(*oppStates)
@@ -353,7 +356,14 @@ func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppState
 		oppStates[x][y-1] = gui.Hit
 		*myHitCounter++
 		if data.Result == "sunk" {
-			SunkShip(oppStates, x, y)
+			var ship_tier *int
+			value := 0
+			ship_tier = &value
+			SunkShip(oppStates, x, y, ship_tier)
+
+			sunk_ships[*ship_tier-1] = sunk_ships[*ship_tier-1] - 1
+			ships_texts[*ship_tier-1].SetText(strconv.FormatInt(int64(*ship_tier), 10) + " Tier Ship -> " + strconv.FormatInt(int64(sunk_ships[*ship_tier-1]), 10))
+			ui.Draw(ships_texts[*ship_tier-1])
 		}
 		if *myHitCounter == 20 {
 			return nil
@@ -367,7 +377,7 @@ func Shot(ctx *context.Context, myBoard, oppBoard *gui.Board, myStates, oppState
 }
 
 func Get_Opp_Shot(myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui.State, ui *gui.GUI, client *http.Client, token string, oppHitCounter, coordsChecked *int) error {
-	time.Sleep(time.Millisecond * 500)
+	time.Sleep(time.Millisecond * 300)
 	data, err := GetGameStatus(client, token)
 	if err != nil {
 		ui.Log("cannot get data: %w", err)
@@ -378,6 +388,10 @@ func Get_Opp_Shot(myBoard, oppBoard *gui.Board, myStates, oppStates *[10][10]gui
 	shotsCounter := 0
 	if *coordsChecked == len(data.Opp_shots) {
 		time.Sleep(time.Millisecond * 200)
+
+		if data.Game_status == "ended" {
+			return nil
+		}
 		Get_Opp_Shot(myBoard, oppBoard, myStates, oppStates, ui, client, token, oppHitCounter, coordsChecked)
 	}
 	for i := *coordsChecked; i < len(data.Opp_shots); i++ {
@@ -424,11 +438,14 @@ func ShortenDesc(desc string) string {
 	return ret
 }
 
-func SunkShip(states *[10][10]gui.State, x, y int) {
+func SunkShip(states *[10][10]gui.State, x, y int, counter *int) {
+	if counter != nil {
+		*counter++
+	}
 	states[x][y-1] = gui.Ship
 	if x <= 9 && x >= 0 && y <= 9 && y >= 0 {
 		if states[x][y] == gui.Hit {
-			SunkShip(states, x, y+1)
+			SunkShip(states, x, y+1, counter)
 		} else {
 			if states[x][y] != gui.Ship {
 				states[x][y] = gui.Miss
@@ -437,7 +454,7 @@ func SunkShip(states *[10][10]gui.State, x, y int) {
 	}
 	if x <= 9 && x >= 0 && y-2 <= 9 && y-2 >= 0 {
 		if states[x][y-2] == gui.Hit {
-			SunkShip(states, x, y-1)
+			SunkShip(states, x, y-1, counter)
 		} else {
 			if states[x][y-2] != gui.Ship {
 				states[x][y-2] = gui.Miss
@@ -446,7 +463,7 @@ func SunkShip(states *[10][10]gui.State, x, y int) {
 	}
 	if x-1 <= 9 && x-1 >= 0 && y-1 <= 9 && y-1 >= 0 {
 		if states[x-1][y-1] == gui.Hit {
-			SunkShip(states, x-1, y)
+			SunkShip(states, x-1, y, counter)
 		} else {
 			if states[x-1][y-1] != gui.Ship {
 				states[x-1][y-1] = gui.Miss
@@ -455,7 +472,7 @@ func SunkShip(states *[10][10]gui.State, x, y int) {
 	}
 	if x+1 <= 9 && x+1 >= 0 && y-1 <= 9 && y-1 >= 0 {
 		if states[x+1][y-1] == gui.Hit {
-			SunkShip(states, x+1, y)
+			SunkShip(states, x+1, y, counter)
 		} else {
 			if states[x+1][y-1] != gui.Ship {
 				states[x+1][y-1] = gui.Miss

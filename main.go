@@ -15,9 +15,9 @@ func main() {
 	nick, desc := intercation.PlayerDescription()
 	var nick_pointer *string = &nick
 	for {
-		oppo, err := intercation.ShowPlayersList(*client)
 		coord := intercation.OwnBoard()
-		err2 := httpfunctions.FirstConnection(desc, nick_pointer, oppo, *client, coord)
+		oppo, err := intercation.ShowPlayersList(*client)
+		err2 := httpfunctions.Game(desc, nick_pointer, oppo, *client, coord)
 		err3 := intercation.PostGameStatistics(nick_pointer, *client)
 		time.Sleep(5 * time.Second)
 

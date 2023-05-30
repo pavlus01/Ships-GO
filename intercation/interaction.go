@@ -182,12 +182,18 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 	go func() {
 		counter := 0
 		tmp := [10][10]gui.State{}
-		// go_back := [10][10]gui.State{}
+		go_back_n := [10][10]gui.State{}
+		go_back_tmp := [10][10]gui.State{}
+		var go_back_coord []string
 
+	mainloop:
 		for {
-			// mainloop:
+			go_back_n = *myStates
+			go_back_tmp = tmp
+			go_back_coord = coord
+
 			for f := 0; f < counter; f++ {
-				// go_back = *myStates
+
 				for i := 0; i < 10; i++ {
 					for j := 0; j < 10; j++ {
 						if myStates[i][j] == gui.Hit {
@@ -202,14 +208,14 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 				var x, y int
 
 				bad_choice := false
+				var char string
 				for !bad_choice {
-					char := board.Listen(context.TODO())
+					char = board.Listen(context.TODO())
 					txt.SetText(fmt.Sprintf("Chosen: %s", char))
 					x, y = httpfunctions.ChangeCooerdinate(char)
 					if myStates[x][y-1] != gui.Hit {
 						txt.SetText("Field " + char + " is not valid!")
 					} else {
-						coord = append(coord, char)
 						myStates[x][y-1] = gui.Ship
 						tmp[x][y-1] = gui.Hit
 						bad_choice = true
@@ -226,18 +232,28 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 				}
 
 				RoundShip(myStates, &tmp, x, y)
+
+				if counter != 4 && !EmptyCheck(myStates, x, y) {
+					*myStates = go_back_n
+					tmp = go_back_tmp
+					coord = go_back_coord
+					board.SetStates(*myStates)
+					txt.SetText("Invalid operation, strat putting this thier ships once again!")
+					continue mainloop
+				}
+				coord = append(coord, char)
 				board.SetStates(*myStates)
 
 				for i := 0; i < 4-counter; i++ {
+					var char string
 					bad_choice := false
 					for !bad_choice {
-						char := board.Listen(context.TODO())
+						char = board.Listen(context.TODO())
 						txt.SetText(fmt.Sprintf("Chosen: %s", char))
 						x, y = httpfunctions.ChangeCooerdinate(char)
 						if myStates[x][y-1] != gui.Hit {
 							txt.SetText("Field " + char + " is not valid!")
 						} else {
-							coord = append(coord, char)
 							myStates[x][y-1] = gui.Ship
 							tmp[x][y-1] = gui.Hit
 							bad_choice = true
@@ -245,10 +261,21 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 						}
 					}
 					RoundShip(myStates, &tmp, x, y)
+
+					if i != (3-counter) && !EmptyCheck(myStates, x, y) {
+						*myStates = go_back_n
+						tmp = go_back_tmp
+						coord = go_back_coord
+						board.SetStates(*myStates)
+						txt.SetText("Invalid operation, strat putting this thier ships once again!")
+						continue mainloop
+					}
+					coord = append(coord, char)
 					board.SetStates(*myStates)
 				}
 
-				httpfunctions.SunkShip(&tmp, x, y)
+				var t *int
+				httpfunctions.SunkShip(&tmp, x, y, t)
 			}
 			if counter == 4 {
 				break
