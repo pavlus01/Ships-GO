@@ -7,37 +7,15 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"shipsgo/helpers"
-	"shipsgo/httpfunctions"
+	"shipsgo/game"
+	"shipsgo/httphelper"
+	"shipsgo/intercation/jsonstructs"
 	"sort"
 	"strconv"
 	"time"
 
 	gui "github.com/grupawp/warships-gui/v2"
 )
-
-type Player_List []struct {
-	Game_status string `json:"game_status"`
-	Nick        string `json:"nick"`
-}
-
-type Player_Stats struct {
-	Stats []struct {
-		Games  int    `json:"games"`
-		Nick   string `json:"nick"`
-		Points int    `json:"points"`
-		Wins   int    `json:"wins"`
-	} `json:"stats"`
-}
-
-type Your_Stats struct {
-	Stats struct {
-		Games  int    `json:"games"`
-		Nick   string `json:"nick"`
-		Points int    `json:"points"`
-		Wins   int    `json:"wins"`
-	} `json:"stats"`
-}
 
 func PlayerDescription() (string, string) {
 	reader := bufio.NewReader(os.Stdin)
@@ -54,12 +32,12 @@ func PlayerDescription() (string, string) {
 }
 
 func ShowPlayersList(client http.Client) (string, error) {
-	resp2, err2 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game/list", nil, "", 5)
+	resp2, err2 := httphelper.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/game/list", nil, "", 5)
 	if err2 != nil {
 		return "", fmt.Errorf("cannot create request: %w", err2)
 	}
 
-	var data Player_List
+	var data jsonstructs.Player_List
 
 	fmt.Println("\nAvailable players list:\n")
 
@@ -90,12 +68,12 @@ func ShowPlayersList(client http.Client) (string, error) {
 }
 
 func PostGameStatistics(nick *string, client http.Client) error {
-	resp2, err2 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/stats", nil, "", 5)
+	resp2, err2 := httphelper.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/stats", nil, "", 5)
 	if err2 != nil {
 		return err2
 	}
 
-	var data Player_Stats
+	var data jsonstructs.Player_Stats
 	isIn := false
 
 	fmt.Println("\nTOP 10 Players list:")
@@ -127,12 +105,12 @@ func PostGameStatistics(nick *string, client http.Client) error {
 	}
 	if !isIn {
 		fmt.Println("------------------------------------------------------------------")
-		resp2, err2 := helpers.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/stats/"+*nick, nil, "", 5)
+		resp2, err2 := httphelper.Request(client, http.MethodGet, "https://go-pjatk-server.fly.dev/api/stats/"+*nick, nil, "", 5)
 		if err2 != nil {
 			return err2
 		}
 
-		var data2 Your_Stats
+		var data2 jsonstructs.Your_Stats
 
 		err := json.NewDecoder(resp2.Body).Decode(&data2)
 		if err != nil {
@@ -212,7 +190,7 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 				for !bad_choice {
 					char = board.Listen(context.TODO())
 					txt.SetText(fmt.Sprintf("Chosen: %s", char))
-					x, y = httpfunctions.ChangeCooerdinate(char)
+					x, y = game.ChangeCooerdinate(char)
 					if myStates[x][y-1] != gui.Hit {
 						txt.SetText("Field " + char + " is not valid!")
 					} else {
@@ -250,7 +228,7 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 					for !bad_choice {
 						char = board.Listen(context.TODO())
 						txt.SetText(fmt.Sprintf("Chosen: %s", char))
-						x, y = httpfunctions.ChangeCooerdinate(char)
+						x, y = game.ChangeCooerdinate(char)
 						if myStates[x][y-1] != gui.Hit {
 							txt.SetText("Field " + char + " is not valid!")
 						} else {
@@ -275,7 +253,7 @@ func SetBoard(myStates *[10][10]gui.State) []string {
 				}
 
 				var t *int
-				httpfunctions.SunkShip(&tmp, x, y, t)
+				game.SunkShip(&tmp, x, y, t)
 			}
 			if counter == 4 {
 				break
