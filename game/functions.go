@@ -55,7 +55,7 @@ func Shot(ctx *context.Context, gf GuiFields, client *http.Client, token string,
 		if len(char) < 2 {
 			return nil
 		}
-		gf.ui.Log("My Shot: %s", char)
+		// gf.ui.Log("My Shot: %s", char)
 		x, y = ChangeCooerdinate(char)
 		if gf.states2[x][y-1] == gui.Hit || gf.states2[x][y-1] == gui.Ship || gf.states2[x][y-1] == gui.Miss {
 			gf.txt.SetText("Field " + char + " is already marked!")
@@ -94,6 +94,7 @@ func Shot(ctx *context.Context, gf GuiFields, client *http.Client, token string,
 
 			gf.sunk_ships[*ship_tier-1] = gf.sunk_ships[*ship_tier-1] - 1
 			gf.ships_texts[*ship_tier-1].SetText(strconv.FormatInt(int64(*ship_tier), 10) + " Tier Ship -> " + strconv.FormatInt(int64(gf.sunk_ships[*ship_tier-1]), 10))
+			gf.ships_texts[*ship_tier-1].SetBgColor(gui.Color{Red: 161, Green: uint8(*ship_tier * 60), Blue: 54})
 			gf.ui.Draw(gf.ships_texts[*ship_tier-1])
 		}
 		if *myHitCounter == 20 {
@@ -103,6 +104,7 @@ func Shot(ctx *context.Context, gf GuiFields, client *http.Client, token string,
 	number := (*myHitCounter / (*myHits)) * 100
 	tmp := fmt.Sprintf("%f", number)[:4]
 	gf.accu.SetText("Shot precision: " + tmp + "%")
+	gf.accu.SetBgColor(gui.Color{Red: 240 - uint8(240*number/100), Green: 88, Blue: 87})
 	gf.board2.SetStates(*gf.states2)
 	return nil
 }
@@ -115,7 +117,7 @@ func Get_Opp_Shot(gf GuiFields, client *http.Client, token string, oppHitCounter
 		return err
 	}
 
-	gf.ui.Log("DATA: %s", data)
+	// gf.ui.Log("DATA: %s", data)
 	shotsCounter := 0
 	if *coordsChecked == len(data.Opp_shots) {
 		time.Sleep(time.Millisecond * 200)
@@ -234,6 +236,7 @@ func DrawGUI(bo jsonstructs.Board, gDesc jsonstructs.GameDescription, data jsons
 	}
 
 	for i := 0; i < len(gf.sunk_ships); i++ {
+		gf.ships_texts[i].SetBgColor(gui.Color{Red: 161, Green: uint8(i * 60), Blue: 54})
 		gf.ui.Draw(gf.ships_texts[i])
 	}
 
@@ -263,9 +266,10 @@ func DrawGUI(bo jsonstructs.Board, gDesc jsonstructs.GameDescription, data jsons
 		gf.ui.Draw(gui.NewText(50, 29, gDesc.Opp_desc, nil))
 	}
 
-	// boardConfig := gui.BoardConfig{RulerColor: gui.Color{Red: 236, Green: 54, Blue: 54}, TextColor: gui.Color{Red: 88, Green: 243, Blue: 212}}
-	gf.board = gui.NewBoard(1, 7, nil)
-	gf.board2 = gui.NewBoard(50, 7, nil)
+	boardConfig := gui.BoardConfig{RulerColor: gui.Color{Red: 241, Green: 91, Blue: 54}, TextColor: gui.Color{Red: 105, Green: 30, Blue: 128},
+		EmptyColor: gui.Grey, HitColor: gui.Red, MissColor: gui.Blue, ShipColor: gui.Green, EmptyChar: 'E', HitChar: 'H', MissChar: 'M', ShipChar: 'S'}
+	gf.board = gui.NewBoard(1, 7, &boardConfig)
+	gf.board2 = gui.NewBoard(50, 7, &boardConfig)
 	gf.ui.Draw(gf.board)
 	gf.ui.Draw(gf.board2)
 	gf.states = &[10][10]gui.State{}

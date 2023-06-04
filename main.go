@@ -24,6 +24,7 @@ func main() {
 		}
 
 		err = game.Game(desc, nick_pointer, oppo, *client, coord)
+		// err = game.WithFortefit(desc, nick_pointer, oppo, *client, coord)
 
 		if err != nil {
 			log.Fatal(err)

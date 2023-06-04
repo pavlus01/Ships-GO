@@ -94,6 +94,7 @@ func Game(desc string, name *string, opponent string, client http.Client, coord 
 	}
 
 	gf := DrawGUI(bo, gDesc, data)
+	*name = data.Nick
 
 	myHitCounter := 0.0
 	myHits := 0.0
@@ -114,8 +115,10 @@ func Game(desc string, name *string, opponent string, client http.Client, coord 
 			if data.Game_status == "ended" {
 				if data.Last_game_status == "win" {
 					gf.txt.SetText("YOU WON")
+					gf.txt.SetBgColor(gui.NewColor(55, 255, 180))
 				} else {
 					gf.txt.SetText("OPPONENT WON")
+					gf.txt.SetBgColor(gui.NewColor(237, 16, 33))
 					for _, coordinate := range bo.Board {
 						x, y := ChangeCooerdinate(coordinate)
 						if gf.states[x][y-1] == gui.Ship {
@@ -146,6 +149,9 @@ func Game(desc string, name *string, opponent string, client http.Client, coord 
 						case <-ticker.C:
 							tmp = tmp - 1
 							gf.timer.SetText("TIME: " + strconv.Itoa(tmp))
+							if tmp < 5 {
+								gf.timer.SetBgColor(gui.Red)
+							}
 							if tmp <= 0 {
 								stop_ticker()
 							}
@@ -164,6 +170,14 @@ func Game(desc string, name *string, opponent string, client http.Client, coord 
 		}
 	}()
 	gf.ui.Start(ctx, nil)
+
+	data, err = GetGameStatus(&client, token)
+	if err != nil {
+		gf.ui.Log("cannot get data: %w", err)
+	}
+	if data.Game_status == "game_in_progress" {
+		httphelper.Request(client, http.MethodDelete, "https://go-pjatk-server.fly.dev/api/game/abandon", nil, token, 5)
+	}
 
 	return nil
 }
