@@ -96,6 +96,7 @@ func Shot(ctx *context.Context, gf GuiFields, client *http.Client, token string,
 			gf.ships_texts[*ship_tier-1].SetText(strconv.FormatInt(int64(*ship_tier), 10) + " Tier Ship -> " + strconv.FormatInt(int64(gf.sunk_ships[*ship_tier-1]), 10))
 			gf.ships_texts[*ship_tier-1].SetBgColor(gui.Color{Red: 161, Green: uint8(*ship_tier * 60), Blue: 54})
 			gf.ui.Draw(gf.ships_texts[*ship_tier-1])
+			gf.board2.SetStates(*gf.states2)
 		}
 		if *myHitCounter == 20 {
 			return nil
@@ -238,6 +239,24 @@ func DrawGUI(bo jsonstructs.Board, gDesc jsonstructs.GameDescription, data jsons
 	for i := 0; i < len(gf.sunk_ships); i++ {
 		gf.ships_texts[i].SetBgColor(gui.Color{Red: 161, Green: uint8(i * 60), Blue: 54})
 		gf.ui.Draw(gf.ships_texts[i])
+	}
+
+	desc1 := gui.NewText(35, 1, "LEGEND:", nil)
+	desc2 := gui.NewText(35, 2, "E -> Empty", nil)
+	desc3 := gui.NewText(35, 3, "M -> Miss", nil)
+	desc4 := gui.NewText(35, 4, "H -> Hit", nil)
+	desc5 := gui.NewText(35, 5, "S -> Sink", nil)
+
+	descTable := []*gui.Text{desc1, desc2, desc3, desc4, desc5}
+
+	for i := 0; i < len(descTable); i++ {
+		// if i == 0 {
+		// 	descTable[i].SetBgColor(gui.Color{Red: 255, Green: 113, Blue: 203})
+		// } else {
+		// 	descTable[i].SetBgColor(gui.Color{Red: 255, Green: 255, Blue: 100})
+		// }
+
+		gf.ui.Draw(descTable[i])
 	}
 
 	gf.timer = gui.NewText(50, 2, "TIMER: ", nil)
